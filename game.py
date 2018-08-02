@@ -83,7 +83,59 @@ class projectile(object):
     def draw(self, screen):
         pygame.draw.circle(screen, self.color, (self.x,self.y), self.radius)
 
+class enemy(object):
+    walkRight = [pygame.image.load('character2_animation/R1E.png'), pygame.image.load('character2_animation/R2E.png'), pygame.image.load('character2_animation/R3E.png'),
+                 pygame.image.load('character2_animation/R4E.png'), pygame.image.load('character2_animation/R5E.png'), pygame.image.load('character2_animation/R6E.png'),
+                 pygame.image.load('character2_animation/R7E.png'), pygame.image.load('character2_animation/R8E.png'), pygame.image.load('character2_animation/R9E.png'),
+                 pygame.image.load('character2_animation/R10E.png'), pygame.image.load('character2_animation/R11E.png')]
+    walkLeft = [pygame.image.load('character2_animation/L1E.png'), pygame.image.load('character2_animation/L2E.png'), pygame.image.load('character2_animation/L3E.png'),
+                pygame.image.load('character2_animation/L4E.png'), pygame.image.load('character2_animation/L5E.png'), pygame.image.load('character2_animation/L6E.png'),
+                pygame.image.load('character2_animation/L7E.png'), pygame.image.load('character2_animation/L8E.png'), pygame.image.load('character2_animation/L9E.png'),
+                pygame.image.load('character2_animation/L10E.png'), pygame.image.load('character2_animation/L11E.png')]
 
+
+    def __init__(self, x, y, width, height, end):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        self.end = end
+        self.path = [self.x, self.end] #zakres ruchu postaci od początku do końca
+        self.walkCount = 0
+        self.vel = 3
+
+    def draw(self, screen):
+        self.move() # przemieszczenie postaci przed narysowaniem
+
+        if self.walkCount + 1 >=33: # 11 obrazków , 11 * 3 = 33
+            self.walkCount = 0
+
+        #Wybór zestawu obrazków w zależności od kierunku ruchu
+        if self.vel > 0:
+            screen.blit(enemy.walkRight[self.walkCount//3], (self.x, self.y))
+            self.walkCount += 1
+        else:
+            screen.blit(enemy.walkLeft[self.walkCount //3], (self.x, self.y))
+            self.walkCount += 1
+
+
+
+    def move(self):
+
+            # Ruch w prawo aż do osiągnięcia wartości "end"
+            if self.vel >0:
+                if self.x + self.vel <self.path[1] :
+                    self.x += self.vel
+                else:
+                    self.vel = self.vel * -1
+                    self.walkCount = 0
+            # Zmiana kierunku ruchu
+            else:
+                if self.x - self.vel  > self.path[0]:
+                    self.x += self.vel
+                else:
+                    self.vel = self.vel * -1
+                    self.walkCount = 0
 
 
 def redrawGameWindow():
@@ -91,6 +143,7 @@ def redrawGameWindow():
     # Resetowanie okna
     screen.blit(bg, (0, 0))  # Ustawienie obrazka tła
     man.draw(screen)
+    goblin.draw(screen)
     for bullet in bullets:
         bullet.draw(screen)
     pygame.display.update()
@@ -98,6 +151,7 @@ def redrawGameWindow():
 
 # Główna pętla gry
 man = player(300,410, 64,64) # instancja klasy player
+goblin = enemy(100, 410, 64, 64, 450)
 bullets = [] #lista przechowująca wszystkie wystrzelone aktualnie kule
 run = True
 
