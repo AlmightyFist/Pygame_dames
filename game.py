@@ -26,8 +26,19 @@ bg = pygame.image.load('character1_animation/bg.jpg')
 # Animacja stania
 char = pygame.image.load('character1_animation/standing.png')
 
+#Sounds
+bulletSound = pygame.mixer.Sound('Sounds/bullet.wav')
+hitSound = pygame.mixer.Sound('Sounds/hit.wav')
+
+music = pygame.mixer.music.load('Sounds/music.mp3')
+
+#Ciągłe odtwarzanie muzyki
+pygame.mixer.music.play(-1)
+
 #Zegar
 clock = pygame.time.Clock()
+
+score = 0 # punktacja
 
 class player(object):
     def __init__(self, x, y, width, height):
@@ -40,6 +51,9 @@ class player(object):
 
         #Parametry fizyczne postaci
         self.vel = 5
+
+        #Ustawienia hitboxów
+        self.hitbox = (self.x + 17, self.y + 11, 29, 50)
 
         #Obsługa skoku
         self.isJump = False
@@ -70,6 +84,9 @@ class player(object):
                 screen.blit(walkRight[0], (self.x,self.y))
             else:
                 screen.blit(walkLeft[0], (self.x,self.y))
+
+        self.hitbox = (self.x + 17, self.y + 11, 29, 50)
+        #pygame.draw.rect(screen, (255,0,0), self.hitbox,2)
 
 class projectile(object):
     def __init__(self, x,y, radius, color, facing):
@@ -103,20 +120,32 @@ class enemy(object):
         self.path = [self.x, self.end] #zakres ruchu postaci od początku do końca
         self.walkCount = 0
         self.vel = 3
+        self.health = 10
+        self.visible = True
+
+        self.hitbox = (self.x + 17, self.y + 2 , 31, 57)
 
     def draw(self, screen):
-        self.move() # przemieszczenie postaci przed narysowaniem
+        if self.visible:
+            self.move() # przemieszczenie postaci przed narysowaniem
 
-        if self.walkCount + 1 >=33: # 11 obrazków , 11 * 3 = 33
-            self.walkCount = 0
+            if self.walkCount + 1 >=33: # 11 obrazków , 11 * 3 = 33
+                self.walkCount = 0
 
-        #Wybór zestawu obrazków w zależności od kierunku ruchu
-        if self.vel > 0:
-            screen.blit(enemy.walkRight[self.walkCount//3], (self.x, self.y))
-            self.walkCount += 1
-        else:
-            screen.blit(enemy.walkLeft[self.walkCount //3], (self.x, self.y))
-            self.walkCount += 1
+            #Wybór zestawu obrazków w zależności od kierunku ruchu
+            if self.vel > 0:
+                screen.blit(enemy.walkRight[self.walkCount//3], (self.x, self.y))
+                self.walkCount += 1
+            else:
+                screen.blit(enemy.walkLeft[self.walkCount //3], (self.x, self.y))
+                self.walkCount += 1
+
+            #Paski życia
+            pygame.draw.rect(screen, (255,0,0), (self.hitbox[0], self.hitbox[1] - 20, 50 , 10))
+            pygame.draw.rect(screen, (0, 128, 0), (self.hitbox[0], self.hitbox[1] - 20, 50 * (1-(10-self.health)/10), 10)) #Redukcja paska zielonego z każdym uderzeniem
+
+            self.hitbox = (self.x + 17, self.y + 2 , 31, 57)
+            #pygame.draw.rect(screen, (255,0,0), self.hitbox,2)
 
 
 
@@ -137,11 +166,23 @@ class enemy(object):
                     self.vel = self.vel * -1
                     self.walkCount = 0
 
+    def hit(self):
+        #Obniżanie życia przy uderzeniu
+        if self.health > 0:
+            self.health -=1
+        else:
+            self.visible = False
+        hitSound.play()
+
 
 def redrawGameWindow():
 
     # Resetowanie okna
     screen.blit(bg, (0, 0))  # Ustawienie obrazka tła
+
+    text = font.render('Score:' + str(score),1,(0,0,0)) #Wyrenderowanie napisu na podstawie zmiennej font
+    screen.blit(text, (390,10))
+
     man.draw(screen)
     goblin.draw(screen)
     for bullet in bullets:
@@ -150,13 +191,18 @@ def redrawGameWindow():
 
 
 # Główna pętla gry
+font = pygame.font.SysFont('comicsans', 30, True, True)
 man = player(300,410, 64,64) # instancja klasy player
 goblin = enemy(100, 410, 64, 64, 450)
 bullets = [] #lista przechowująca wszystkie wystrzelone aktualnie kule
 run = True
 
+#Obsługa strzałów
+shootCount = 0
+
 while run:
     clock.tick(27)  # ilość klatek na sekundę, FPS
+
 
     # Obsługa wydarzeń
     for event in pygame.event.get():
@@ -164,6 +210,14 @@ while run:
             run = False
 
     for bullet in bullets:
+
+        #Sprawdzenie kolizji bullet i goblin
+        if bullet.y - bullet.radius < goblin.hitbox[1] + goblin.hitbox[3] and bullet.y + bullet.radius > goblin.hitbox[1]: # sprawdzenie współrzędnej y
+            if bullet.x + bullet.radius > goblin.hitbox[0] and bullet.x - bullet.radius < goblin.hitbox[0] + goblin.hitbox[2]: # sprawdzenie współrzędnej x
+                goblin.hit()
+                score += 1 # zwiększenie punktacji w momencie trafienia goblina
+                bullets.pop(bullets.index(bullet)) # usunięcie kuli
+
         if bullet.x < SCREEN_WIDTH and bullet.x > 0: # sprawdzenie czy kula znajduje się w obrębie ekranu
             bullet.x += bullet.vel
         else:
@@ -172,8 +226,15 @@ while run:
     # Obsługa sterowania
     keys = pygame.key.get_pressed()
 
+    #Obsłucha ilości wystrzelonych kul
+
+    if shootCount > 0:
+        shootCount += 1
+    if shootCount >3:
+        shootCount = 0
+
     #Strzał
-    if keys[pygame.K_SPACE]:
+    if keys[pygame.K_SPACE] and shootCount == 0:
         if man.left: # określenie w którą stronę patrzy postać
             facing = -1
         else:
@@ -181,6 +242,9 @@ while run:
 
         if len(bullets) < 5: # ograniczenie ilości kul na ekranie
             bullets.append(projectile(round(man.x + man.width//2), round(man.y + man.height//2), 6,(0,0,0), facing))
+            bulletSound.play()
+
+        shootCount = 1
 
     # Porusznia lewa, prawa
     if keys[pygame.K_LEFT] and man.x > 0:
